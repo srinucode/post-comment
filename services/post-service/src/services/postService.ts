@@ -17,11 +17,19 @@ export const deletePostById = async (postId: string): Promise<IPost | null> => {
   return await Post.findByIdAndDelete(postId);
 };
 
-/** Delete all posts by userId */
-export const deletePostsByUserId = async (userId: string): Promise<{ deletedCount?: number }> => {
-  return await Post.deleteMany({ userId });
-};
+/** Delete all posts by userId and return deleted posts */
+export const deletePostsByUserId = async (userId: string): Promise<IPost[]> => {
+  // 1. Find posts before deleting
+  const postsToDelete = await Post.find({ userId });
 
+  if (postsToDelete.length > 0) {
+    // 2. Delete them
+    await Post.deleteMany({ userId });
+  }
+
+  // 3. Return deleted posts so controller can publish events
+  return postsToDelete;
+};
 
 // Get multiple posts by IDs
 export const getPostsByIds = async (postIds: string[]): Promise<IPost[]> => {

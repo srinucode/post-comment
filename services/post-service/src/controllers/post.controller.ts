@@ -6,7 +6,7 @@ import * as postService from "../services/postService";
 
 /**
  * @swagger
- * /post/create:
+ * /posts:
  *   post:
  *     summary: Create a new post
  *     tags: [Posts]
@@ -27,6 +27,19 @@ import * as postService from "../services/postService";
  *     responses:
  *       201:
  *         description: Post created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Post created successfully"
+ *                 postId:
+ *                   type: string
+ *                   example: "650f0b7f1a2d3a1c12345678"
+ *                 post:
+ *                   $ref: '#/components/schemas/Post'
  *       400:
  *         description: Bad request
  *       401:
@@ -62,7 +75,56 @@ export const createPost = async (req: AuthRequest, res: Response) => {
 
 /**
  * @swagger
- * /post/{postId}:
+ * /posts/user/{userId}:
+ *   get:
+ *     summary: Get all posts by a user
+ *     tags: [Posts]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The ID of the user
+ *     responses:
+ *       200:
+ *         description: List of posts by the user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 posts:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Post'
+ *       404:
+ *         description: No posts found for this user
+ *       400:
+ *         description: Error fetching posts
+ */
+export const getPostsByUser = async (req: AuthRequest, res: Response) => {
+  try {
+    const { userId } = req.params;
+    console.log("Fetching posts for user ID:", userId);
+    const posts = await postService.getPostsByUser(userId);
+
+    if (!posts || posts.length === 0) {
+      return res.status(404).json({ message: "No posts found for this user" });
+    }
+
+    res.json({ posts });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message || "Error fetching posts" });
+  }
+};
+
+
+/**
+ * @swagger
+ * /posts/{id}:
  *   delete:
  *     summary: Delete a post by ID
  *     tags: [Posts]
@@ -70,7 +132,7 @@ export const createPost = async (req: AuthRequest, res: Response) => {
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: postId
+ *         name: id
  *         required: true
  *         schema:
  *           type: string
@@ -82,6 +144,8 @@ export const createPost = async (req: AuthRequest, res: Response) => {
  *         description: Post not found
  *       401:
  *         description: Unauthorized
+ *       400:
+ *         description: Bad request
  */
 export const deletePostById = async (req: AuthRequest, res: Response) => {
   try {
@@ -120,7 +184,7 @@ export const deletePostById = async (req: AuthRequest, res: Response) => {
 
 /**
  * @swagger
- * /post/user/{userId}:
+ * /posts/user/{userId}:
  *   delete:
  *     summary: Delete all posts by a user
  *     tags: [Posts]
@@ -135,124 +199,52 @@ export const deletePostById = async (req: AuthRequest, res: Response) => {
  *         description: The ID of the user whose posts should be deleted
  *     responses:
  *       200:
- *         description: All posts by user deleted successfully
+ *         description: All posts by the user deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "All posts by user deleted successfully"
+ *                 deletedCount:
+ *                   type: integer
+ *                   example: 3
  *       401:
  *         description: Unauthorized
+ *       400:
+ *         description: Bad request
  */
 export const deletePostsByUser = async (req: AuthRequest, res: Response) => {
   try {
     const { userId } = req.params;
-    await postService.deletePostsByUserId(userId);
-    res.json({ message: "All posts by user deleted successfully" });
+
+    const deletedPosts = await postService.deletePostsByUserId(userId);
+
+    // Publish each deleted post as an event
+    const channel = getChannel();
+    if (channel && deletedPosts.length > 0) {
+      await channel.assertExchange("post_events", "fanout", { durable: false });
+
+      deletedPosts.forEach((post) => {
+        const event = {
+          action: "DELETE_ALL_BY_USER",
+          postId: post._id,
+          userId: post.userId,
+          deletedAt: new Date(),
+          event: "POST_DELETED"
+        };
+        channel.publish("post_events", "", Buffer.from(JSON.stringify(event)));
+        console.log("📩 Post delete event published:", event);
+      });
+    }
+
+    res.json({
+      message: "All posts by user deleted successfully",
+      deletedCount: deletedPosts.length,
+    });
   } catch (error: any) {
     res.status(400).json({ message: error.message || "Error deleting posts" });
   }
 };
-
-
-
-
-
-// export const createPost = async (req: AuthRequest, res: Response) => {
-//   console.log("create post route");
-//   // const { userId, content } = req.body;
-//   // const newPost = { id: posts.length + 1, userId, content, createdAt: new Date() };
-//   // posts.push(newPost);
-
-//   // // Publish event to RabbitMQ
-//   // const channel = getChannel();
-//   // if (channel) {
-//   //   await channel.assertExchange("post_events", "fanout", { durable: false });
-//   //   channel.publish("post_events", "", Buffer.from(JSON.stringify(newPost)));
-//   //   console.log("📩 Post event published:", newPost);
-//   // }
-
-//   // res.status(201).json(newPost);
-//   return res.status(201).json({ message: "Post created (mock)" });
-// };
-
-export const getPosts = (req: Request, res: Response) => {
-  res.json(posts);
-}
-
-
-/**
- * @swagger
- * /post/batch:
- *   post:
- *     summary: Get multiple posts by IDs
- *     tags: [Posts]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - postIds
- *             properties:
- *               postIds:
- *                 type: array
- *                 items:
- *                   type: string
- *                 example: ["650f0b7f1a2d3a1c12345678", "650f0b7f1a2d3a1c87654321"]
- *     responses:
- *       200:
- *         description: List of posts
- *       400:
- *         description: Bad request
- */
-export const getPostsByIds = async (req: AuthRequest, res: Response) => {
-  try {
-    const { postIds } = req.body;
-    if (!postIds || !Array.isArray(postIds)) {
-      return res.status(400).json({ message: "postIds must be an array" });
-    }
-
-    const posts = await postService.getPostsByIds(postIds);
-    res.json({ posts });
-  } catch (error: any) {
-    res.status(400).json({ message: error.message || "Error fetching posts" });
-  }
-};
-
-/**
- * @swagger
- * /post/user/{userId}:
- *   get:
- *     summary: Get all posts by a user
- *     tags: [Posts]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: string
- *         description: The ID of the user
- *     responses:
- *       200:
- *         description: List of posts by the user
- *       404:
- *         description: No posts found for this user
- */
-export const getPostsByUser = async (req: AuthRequest, res: Response) => {
-  try {
-    const { userId } = req.params;
-    console.log("Fetching posts for user ID:", userId);
-    const posts = await postService.getPostsByUser(userId);
-
-    if (!posts || posts.length === 0) {
-      return res.status(404).json({ message: "No posts found for this user" });
-    }
-
-    res.json({ posts });
-  } catch (error: any) {
-    res.status(400).json({ message: error.message || "Error fetching posts" });
-  }
-};
-
-

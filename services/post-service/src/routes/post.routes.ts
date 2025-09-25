@@ -1,15 +1,21 @@
 import { Router } from "express";
-import { createPost, deletePostById, getPosts, deletePostsByUser, getPostsByUser, getPostsByIds } from "../controllers/post.controller";
+import { 
+    createPost, 
+    deletePostById, 
+    deletePostsByUser, 
+    getPostsByUser
+} from "../controllers/post.controller";
 import {authMiddleware} from "../middleware/authMiddleware";
 
 const router = Router();
 
-router.post("/create", authMiddleware, createPost);
-router.get("/", authMiddleware, getPosts);
+
+// POST /posts
+router.post("/", authMiddleware, createPost);
+// GET /posts/user/:userId
+router.get("/user/:userId", authMiddleware, getPostsByUser);
+// DELETE /posts/:id
 router.delete("/:id", authMiddleware, deletePostById);
+// DELETE /posts/user/:userId
 router.delete("/user/:userId", authMiddleware, deletePostsByUser);
-
-router.post("/batch", authMiddleware, getPostsByIds);   // New
-router.get("/user/:userId", authMiddleware, getPostsByUser); // New
-
 export default router;

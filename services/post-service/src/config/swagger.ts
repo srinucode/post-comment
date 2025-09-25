@@ -22,7 +22,7 @@ const swaggerOptions = {
     },
     security: [{ bearerAuth: [] }],
   },
-  apis: ["./src/controllers/*.ts"],
+  apis: ["./src/controllers/*.ts", "./src/routes/*.ts", "./src/models/*.ts"],
 };
 
 export const setupSwagger = (app: Express) => {
