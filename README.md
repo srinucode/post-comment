@@ -74,7 +74,7 @@ Both services communicate via **RabbitMQ** events.
 
 ```bash
 # Clone the repository
-git clone <repo-url>
+git clone https://github.com/srinucode/post-comment.git
 cd post-comment
 
 # Install dependencies for Post Service
