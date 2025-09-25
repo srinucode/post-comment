@@ -1,11 +1,12 @@
+import dotenv from "dotenv";
 import express from "express";
 import bodyParser from "body-parser";
 import postRoutes from "./routes/post.routes";
 import { connectRabbitMQ } from "./messaging/rabbit";
 import { setupSwagger } from "./config/swagger";
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 dotenv.config();   // Must be at the very top
+
 
 
 connectRabbitMQ();

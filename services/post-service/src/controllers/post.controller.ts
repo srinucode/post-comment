@@ -104,6 +104,7 @@ export const deletePostById = async (req: AuthRequest, res: Response) => {
         postId: postId,
         userId: req.user!.id,
         deletedAt: new Date(),
+        event: "POST_DELETED"
       };
       channel.publish("post_events", "", Buffer.from(JSON.stringify(event)));
       console.log("📩 Post delete event published:", event);
